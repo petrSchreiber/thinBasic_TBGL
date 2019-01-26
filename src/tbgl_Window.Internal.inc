@@ -7,6 +7,10 @@
 ' =============================================================================
 
 ' =============================================================================================
+
+%PeriodicFuncTimer = 1000
+GLOBAL keyPressed() AS BYTE
+
 ' -- Flag holding info whether sources were released already
 GLOBAL CleanUpPerformedAlready AS BYTE
 DECLARE FUNCTION wglGetExtensionStringARB_Prototype(BYVAL hDc AS DWORD) AS DWORD
@@ -190,9 +194,11 @@ SUB internal_MaximizeKeepAspectRatio( )
     GetWindowRect g_Win.handle, wr
 
     currentDisplay = internal_GetWindowDisplay(g_Win.handle)
+    dim info as tbgl_tDisplayInfo
+    internal_displayGetInfo(currentDisplay, info)
 
-    sx = g_DisplayWidth
-    sy = g_DisplayHeight
+    sx = info.widthPx
+    sy = info.heightPx
 
     IF g_Win.FullScreen = 0 THEN    ' -- Windowed
       IF g_Win.ignrAspect = 0 THEN
@@ -204,12 +210,12 @@ SUB internal_MaximizeKeepAspectRatio( )
           xx = ( sy - ( wr.nBottom - wr.nTop - cr.nBottom )) * g_Win.aspectRat
           xx+= ( wr.nRight - wr.nLeft - cr.nRight )
         END IF
-        x = ( sx - xx ) / 2 + g_DisplayLeft
-        y = ( sy - yy ) / 2 + g_DisplayTop
+        x = ( sx - xx ) / 2 + info.leftPx
+        y = ( sy - yy ) / 2 + info.topPx
       ELSE
 
-        x = g_DisplayLeft
-        y = g_DisplayTop
+        x = info.leftPx
+        y = info.topPx
         xx = sx - 1    ' oh well :")
         yy = sy - 1
       END IF

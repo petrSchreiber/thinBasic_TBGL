@@ -8,13 +8,14 @@
 
 ' -----------------------------------------------------------------------------
 #INCLUDE "tbgl_Window.CDropTarget.inc"
+#INCLUDE "tbgl_Window.Display.inc"
+#INCLUDE "tbgl_Window.Internal.inc"
+
 ' -----------------------------------------------------------------------------
 
 GLOBAL windowSizing AS LONG   ' -- Is window sized now?
-GLOBAL keyPressed() AS BYTE
 GLOBAL tbgl_MouseWheelDelta AS LONG
 
-%PeriodicFuncTimer = 1000
 GLOBAL CallingWindow AS LONG
 ' -----------------------------------------------------------------------------
 
@@ -102,14 +103,14 @@ FUNCTION Exec_TBGL_CreateWindowEx( ) AS EXT
   g_Win.BitDepth = Bpp
   m_Validate_gWin_BitDepth
 
-  g_Win.aspectRat# = g_Win.xRes / g_Win.yRes
+  g_Win.aspectRat = g_Win.xRes / g_Win.yRes
 
-  ' -- Creation of fullscreen window
-  IF g_Win.FullScreen = 1 THEN
+  IF g_Win.FullScreen THEN
+    ' -- Creation of fullscreen window
     g_Win.handle = CreateWindowEx( %WS_EX_LEFT, g_Win.ClassName, BYCOPY CAPTION, %WS_POPUP OR %WS_VISIBLE OR %WS_CLIPCHILDREN OR %WS_CLIPSIBLINGS, 0, 0, xRes, yRes, 0, 0, g_ModuleInstance, BYVAL 0 )
     internal_SetFullscreenMode( "TBGL_CreateWindowEx" )
   ELSE
-  ' -- Creation of standard window
+    ' -- Creation of standard window
     flagsWindowed = g_Win.flagsWindowed
 
     ' -- [!] information is stored on bit positions according to %TBGL_WS_* flags
@@ -120,9 +121,29 @@ FUNCTION Exec_TBGL_CreateWindowEx( ) AS EXT
     IF BIT( flags, 4 )     THEN g_Win.ignrAspect = 1
     IF BIT( flags, 5 ) = 0 THEN flagsWindowed    = flagsWindowed OR %WS_THICKFRAME
 
-    g_Win.handle = CreateWindowEx( %WS_EX_LEFT, g_Win.ClassName, BYCOPY CAPTION, _
-                                   flagsWindowed OR %WS_CLIPCHILDREN OR %WS_CLIPSIBLINGS, _
-                                   xPos, yPos, xRes, yRes, %Null, %Null, g_ModuleInstance, BYVAL %Null )
+    dim windowExStyle as dword
+    dim windowStyle as dword
+
+    windowExStyle = %WS_EX_LEFT
+    windowStyle = flagsWindowed OR %WS_CLIPCHILDREN OR %WS_CLIPSIBLINGS
+
+    ' -- Adjust the client area to match desired resolution
+    dim winRect as RECT
+
+    winRect.left = g_win.xPos
+    winRect.right = g_win.xPos + g_win.xRes
+    winRect.top = g_win.yPos
+    winRect.bottom = g_win.yPos + g_win.yRes
+
+    AdjustWindowRectEx(winRect, windowStyle, %FALSE, windowExStyle)
+
+    g_win.xRes = winRect.right - winRect.left
+    g_win.yRes = winRect.bottom - winRect.top
+
+    ' -- Create with correct client area
+    g_Win.handle = CreateWindowEx(windowExStyle, g_Win.ClassName, BYCOPY CAPTION, _
+                                  windowStyle, _
+                                  g_Win.xPos, g_Win.yPos, g_win.xRes, g_win.yRes, %Null, %Null, g_ModuleInstance, BYVAL %Null )
 
     IF BIT( flags, 3 ) = 0 THEN    ' -- Close functionality is associated with system menu
       LOCAL hMenu, wFlags AS DWORD
@@ -157,42 +178,14 @@ FUNCTION WndProc( BYVAL hWnd AS DWORD, BYVAL wMsg AS DWORD, BYVAL wParam AS LONG
       FUNCTION = %TRUE
 
     CASE %WM_CREATE
-
-      ' -- Check if created window has really the requested client area, if not, resize
-      IF g_Win.FullScreen = 0 THEN
-        LOCAL sx, sy AS LONG
-        sx = GetSystemMetrics( %SM_CXSCREEN )
-        sy = GetSystemMetrics( %SM_CYSCREEN )
-
-        GetWindowRect hWnd, wr
-        GetClientRect hWnd, cr
-
-        x = wr.nLeft
-        y = wr.nTop
-        xx = ( wr.nRight - wr.nLeft ) + ( g_Win.Xres - ( cr.nRight - cr.nLeft ))
-        yy = ( wr.nBottom - wr.nTop ) + ( g_Win.Yres - ( cr.nBottom - cr.nTop ))
-
-        IF x = 0 THEN x = ( sx - xx ) / 2
-        IF y = 0 THEN y = ( sy - yy ) / 2
-        MoveWindow hWnd, x, y, xx, yy, %TRUE
-
-        lastWidth  = xx
-        lastHeight = yy
-
-      END IF
-
-      ' -- Initializes openGL
       g_Win.hDC = GetDC( hWnd )
       internal_InitOpenGL()
 
-      FUNCTION = 0    ' -- to proceed as usual
+      FUNCTION = 0
       EXIT FUNCTION
 
     CASE %WM_MOUSEWHEEL
       tbgl_MouseWheelDelta = SGN( HI( INTEGER, wParam ))
-
-'    CASE %WM_SIZING
-
 
     CASE %WM_SIZE
 
@@ -474,8 +467,9 @@ SUB Exec_TBGL_ShowWindow( )
   g_Win.ignrAspect = 0
 
   GetWindowRect( g_Win.handle, d )
-  sx = GetSystemMetrics( %SM_CXSCREEN )
-  sy = GetSystemMetrics( %SM_CYSCREEN )
+  desktop get client to sx, sy
+'  sx = GetSystemMetrics( %SM_CXSCREEN )
+'  sy = GetSystemMetrics( %SM_CYSCREEN )
 
   ' -- If window gets bigger than desktop
   IF d.nRight - d.nLeft > sx OR d.nBottom - d.nTop > sy THEN internal_MaximizeKeepAspectRatio
@@ -536,232 +530,6 @@ SUB Exec_TBGL_GetWindowClient( )
   IF ParensPresent = %TRUE THEN thinBasic_CheckCloseParens_Mandatory
 
 END SUB
-
-GLOBAL g_DisplayCount, g_DisplayIndex, g_DisplayWidth, g_DisplayHeight, g_DisplayLeft, g_DisplayTop, g_DisplayRight, g_DisplayBottom AS LONG
-FUNCTION DisplayEnumProc(BYVAL hMonitor AS DWORD, BYVAL hDc AS DWORD, BYREF r AS RECT, BYVAL lParam AS DWORD) AS LONG
-  g_DisplayCount += 1
-
-  IF g_DisplayCount = 1 THEN
-    g_DisplayLeft   = 0
-    g_DisplayTop    = 0
-    g_DisplayWidth  = 0
-    g_DisplayHeight = 0
-  END IF
-
-  ' -- Works ok even if Index is not defined
-  IF g_DisplayCount = g_DisplayIndex THEN
-    g_DisplayLeft   = r.nLeft
-    g_DisplayTop    = r.nTop
-    g_DisplayRight  = r.nRight
-    g_DisplayBottom = r.nBottom
-
-    g_DisplayWidth  = g_DisplayRight - g_DisplayLeft
-    g_DisplayHeight = g_DisplayBottom - g_DisplayTop
-    FUNCTION = 0
-  ELSE
-    FUNCTION = 1
-  END IF
-
-END FUNCTION
-
-GLOBAL g_WindowLeft, g_WindowTop AS LONG
-FUNCTION DisplayWindowFinderProc(BYVAL hMonitor AS DWORD, BYVAL hDc AS DWORD, BYREF r AS RECT, BYVAL lParam AS DWORD) AS LONG
-  g_DisplayCount += 1
-
-  IF g_DisplayCount = 1 THEN
-    g_DisplayLeft   = 0
-    g_DisplayTop    = 0
-    g_DisplayWidth  = 0
-    g_DisplayHeight = 0
-  END IF
-
-  IF r.nRight > g_WindowLeft THEN
-    g_DisplayIndex = g_DisplayCount
-
-    g_DisplayLeft   = r.nLeft
-    g_DisplayTop    = r.nTop
-    g_DisplayRight  = r.nRight
-    g_DisplayBottom = r.nBottom
-
-    g_DisplayWidth  = g_DisplayRight - g_DisplayLeft
-    g_DisplayHeight = g_DisplayBottom - g_DisplayTop
-    FUNCTION = 0
-  ELSE
-    FUNCTION = 1
-  END IF
-
-END FUNCTION
-
-FUNCTION Exec_TBGL_DisplayGetCount() AS LONG
-
-  LOCAL ParensPresent AS LONG
-  IF thinBasic_CheckOpenParens_Optional = %TRUE THEN thinBasic_CheckCloseParens_Mandatory
-
-  g_DisplayCount = 0
-  g_DisplayIndex = 0
-
-  IF EnumDisplayMonitors(0, BYVAL 0, CODEPTR(DisplayEnumProc), 0) <> 0 THEN
-    FUNCTION = g_DisplayCount
-  ELSE
-    FUNCTION = 1
-  END IF
-END FUNCTION
-
-FUNCTION Exec_TBGL_DisplayGetInfo() AS LONG
-  '---Declare needed variables. To change a variable we need
-  '---a reference pointer and an aboslute position (in case of arrays)
-  LOCAL eDisplayNumber AS EXT
-
-  LOCAL lVariablePtr1 AS LONG
-  LOCAL lVariableAbsPos1 AS LONG
-
-  LOCAL lVariablePtr2 AS LONG
-  LOCAL lVariableAbsPos2 AS LONG
-
-  LOCAL lVariablePtr3 AS LONG
-  LOCAL lVariableAbsPos3 AS LONG
-
-  LOCAL eResult1 AS EXT
-  LOCAL eResult2 AS EXT
-  LOCAL eResult3 AS EXT
-
-  LOCAL ParensPresent AS LONG
-
-  LOCAL dHdc AS DWORD
-
-  IF thinBasic_CheckOpenParens_Mandatory THEN
-    '---Check if any error
-    IF thinBasic_ErrorFree THEN
-
-      thinBasic_ParseNumber eDisplayNumber
-      IF thinBasic_CheckComma( ) AND thinBasic_ErrorFree THEN
-
-        '---Get reference of first variable
-        thinBasic_VariableParse( lVariablePtr1, lVariableAbsPos1 )
-
-        IF thinBasic_CheckComma( ) AND thinBasic_ErrorFree THEN
-          thinBasic_VariableParse( lVariablePtr2, lVariableAbsPos2 )
-
-          IF thinBasic_CheckComma_Optional( ) AND thinBasic_ErrorFree THEN
-            thinBasic_VariableParse( lVariablePtr3, lVariableAbsPos3 )
-          END IF
-
-          IF thinBasic_ErrorFree THEN
-
-            g_DisplayCount = 0
-            g_DisplayIndex = eDisplayNumber
-
-            EnumDisplayMonitors(0, BYVAL 0, CODEPTR(DisplayEnumProc), 0)
-
-            eResult1 = g_DisplayWidth
-            eResult2 = g_DisplayHeight
-            dHdc = GetDC( %HWND_DESKTOP )
-            eResult3 = GetDeviceCaps( dHDc, %BITSPIXEL )
-            ReleaseDC( %HWND_DESKTOP, dHdc )
-
-            '---Here do what you need to do
-            '---Now assign values to referenced variables
-            thinBasic_ChangeVariableNumberDirect( lVariablePtr1, lVariableAbsPos1, eResult1 )
-            thinBasic_ChangeVariableNumberDirect( lVariablePtr2, lVariableAbsPos2, eResult2 )
-            IF lVariablePtr3 THEN
-              thinBasic_ChangeVariableNumberDirect( lVariablePtr3, lVariableAbsPos3, eResult3 )
-            END IF
-          END IF
-        END IF
-      END IF
-    END IF
-  END IF
-
-  thinBasic_CheckCloseParens_Mandatory
-
-END FUNCTION
-
-FUNCTION Exec_TBGL_SendWindowToDisplay() AS LONG
-
-  LOCAL wHandle AS EXT
-  LOCAL currentDisplay, eDisplay AS EXT
-  LOCAL newX, newY AS EXT
-  LOCAL r AS RECT
-
-  IF thinBasic_CheckOpenParens_Mandatory THEN
-    thinBasic_ParseNumber(wHandle)
-    IF thinBasic_CheckComma_Mandatory THEN
-      thinBasic_ParseNumber(eDisplay)
-
-      currentDisplay = internal_GetWindowDisplay(wHandle)
-      GetWindowRect(wHandle, r)
-
-      newX = r.nLeft-g_DisplayLeft
-      newY = r.nTop-g_DisplayTop
-
-      IF thinBasic_CheckComma_Optional THEN
-        thinBasic_ParseNumber(NewX)
-      END IF
-      IF thinBasic_CheckComma_Optional THEN
-        thinBasic_ParseNumber(NewY)
-      END IF
-      IF thinBasic_CheckCloseParens_Mandatory THEN
-
-
-        g_DisplayCount = 0
-        g_DisplayIndex = eDisplay
-
-        EnumDisplayMonitors(0, BYVAL 0, CODEPTR(DisplayEnumProc), 0)
-
-        newX += g_DisplayLeft
-        newY += g_DisplayTop
-        IF newX > g_DisplayRight THEN
-          newX = g_DisplayLeft
-        END IF
-
-        IF newY > g_DisplayBottom THEN
-          newY = g_DisplayTop
-        END IF
-
-        GetWindowRect(wHandle, r)
-        MoveWindow(wHandle, newX, newY, r.nRight-r.nLeft, r.nBottom-r.nTop, %TRUE)
-
-      END IF
-    END IF
-  END IF
-
-END FUNCTION
-
-FUNCTION internal_GetWindowDisplay(BYVAL wHandle AS DWORD) AS LONG
-  LOCAL wr AS RECT
-  LOCAL cr AS RECT
-
-  g_DisplayCount = 0
-  g_DisplayIndex = 0
-
-  GetWindowRect(wHandle, wr)
-  GetClientRect(wHandle, cr)
-  g_WindowLeft = wr.nLeft - (((wr.nLeft-wr.nRight)-(cr.nLeft-cr.nRight))/2)
-  g_WindowTop = wr.nTop
-  EnumDisplayMonitors(0, BYVAL 0, CODEPTR(DisplayWindowFinderProc), 0)
-
-  FUNCTION = g_DisplayIndex
-  g_DisplayIndex = 0
-
-END FUNCTION
-
-
-FUNCTION Exec_TBGL_GetWindowDisplay() AS LONG
-  LOCAL eDisplay AS LONG
-  LOCAL wHandle AS EXT
-  LOCAL r AS RECT
-
-  IF thinBasic_CheckOpenParens_Mandatory THEN
-    thinBasic_ParseNumber(wHandle)
-    IF thinBasic_CheckCloseParens_Mandatory THEN
-
-      FUNCTION = internal_GetWindowDisplay(wHandle)
-
-    END IF
-  END IF
-
-END FUNCTION
-
 
 SUB Exec_TBGL_GetDesktopInfo( )
 
@@ -1254,6 +1022,3 @@ FUNCTION Exec_TBGL_SetWindowMinClient() AS EXT
   END IF
 
 END FUNCTION
-
-' -----------------------------------------------------------------------------
-#INCLUDE "tbgl_Window.Internal.inc"
