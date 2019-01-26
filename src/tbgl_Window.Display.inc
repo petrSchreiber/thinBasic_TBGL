@@ -76,8 +76,10 @@ end function
 
 function Exec_TBGL_DisplayGetCount() as long
 
+  ' -- Parsing input
   if thinBasic_CheckOpenParens_Optional() then thinBasic_CheckCloseParens_Mandatory()
 
+  ' -- Actual code
   dim displayCount as dword
   if EnumDisplayMonitors(0, byVal 0, codePtr(DisplayProc_Counter), varptr(displayCount)) <> 0 then
     function = displayCount
@@ -97,59 +99,48 @@ function internal_displayGetInfo(byVal displayNo as long, byRef info as tbgl_tDi
 end function
 
 function Exec_TBGL_DisplayGetInfo() as long
+
+  ' -- Parsing input
+  if thinBasic_CheckOpenParens_Mandatory = %FALSE or thinBasic_ErrorFree = %FALSE then exit function
   dim eDisplayNumber as ext
+  thinBasic_ParseNumber eDisplayNumber
 
+  if thinBasic_CheckComma = %FALSE or thinBasic_ErrorFree = %FALSE then exit function
   local lVariablePtr1, lVariableAbsPos1 as long
+  thinBasic_VariableParse( lVariablePtr1, lVariableAbsPos1 )
+
+  if thinBasic_CheckComma = %FALSE or thinBasic_ErrorFree = %FALSE then exit function
   local lVariablePtr2, lVariableAbsPos2 as long
-  local lVariablePtr3, lVariableAbsPos3 as long
+  thinBasic_VariableParse( lVariablePtr2, lVariableAbsPos2 )
 
-  local eResult1, eResult2, eResult3 as ext
-
-  dim ParensPresent as long
-
-  dim dHdc as dword
-
-  if thinBasic_CheckOpenParens_Mandatory and thinBasic_ErrorFree then
-
-    thinBasic_ParseNumber eDisplayNumber
-    if thinBasic_CheckComma( ) AND thinBasic_ErrorFree then
-
-      '---Get reference to the first variable
-      thinBasic_VariableParse( lVariablePtr1, lVariableAbsPos1 )
-
-      if thinBasic_CheckComma( ) AND thinBasic_ErrorFree then
-        thinBasic_VariableParse( lVariablePtr2, lVariableAbsPos2 )
-
-        if thinBasic_CheckComma_Optional( ) AND thinBasic_ErrorFree then
-          thinBasic_VariableParse( lVariablePtr3, lVariableAbsPos3 )
-        end if
-
-        if thinBasic_ErrorFree then
-
-          dim info as tbgl_tDisplayInfo
-          internal_displayGetInfo(eDisplayNumber, info)
-
-          eResult1 = info.widthPx
-          eResult2 = info.heightPx
-
-          dHdc = GetDC( %HWND_DESKTOP )
-          eResult3 = GetDeviceCaps( dHDc, %BITSPIXEL )
-          ReleaseDC( %HWND_DESKTOP, dHdc )
-
-          ' -- Promoting the values back to passed variables
-          thinBasic_ChangeVariableNumberDirect( lVariablePtr1, lVariableAbsPos1, eResult1 )
-          thinBasic_ChangeVariableNumberDirect( lVariablePtr2, lVariableAbsPos2, eResult2 )
-
-          if lVariablePtr3 then
-            thinBasic_ChangeVariableNumberDirect( lVariablePtr3, lVariableAbsPos3, eResult3 )
-          end if
-        end if
-
-      end if
-    end if
+  if thinBasic_CheckComma_Optional and thinBasic_ErrorFree then
+    local lVariablePtr3, lVariableAbsPos3 as long
+    thinBasic_VariableParse( lVariablePtr3, lVariableAbsPos3 )
   end if
 
+  if thinBasic_ErrorFree = %FALSE then exit function
   thinBasic_CheckCloseParens_Mandatory
+
+  ' -- Actual code
+  dim info as tbgl_tDisplayInfo
+  internal_displayGetInfo(eDisplayNumber, info)
+
+  local eResult1, eResult2, eResult3 as ext
+  eResult1 = info.widthPx
+  eResult2 = info.heightPx
+
+  ' -- Promoting the values back to passed variables
+  thinBasic_ChangeVariableNumberDirect( lVariablePtr1, lVariableAbsPos1, eResult1 )
+  thinBasic_ChangeVariableNumberDirect( lVariablePtr2, lVariableAbsPos2, eResult2 )
+
+  if lVariablePtr3 then
+    dim dHdc as dword
+    dHdc = GetDC( %HWND_DESKTOP )
+    eResult3 = GetDeviceCaps( dHDc, %BITSPIXEL )
+    ReleaseDC( %HWND_DESKTOP, dHdc )
+
+    thinBasic_ChangeVariableNumberDirect( lVariablePtr3, lVariableAbsPos3, eResult3 )
+  end if
 
 end function
 
@@ -162,48 +153,50 @@ function Exec_TBGL_SendWindowToDisplay() as long
   dim newY as ext
   dim r as RECT
 
-  if thinBasic_CheckOpenParens_Mandatory then
-    thinBasic_ParseNumber(wHandle)
-    if thinBasic_CheckComma_Mandatory then
-      thinBasic_ParseNumber(eDisplay)
+  ' -- Parsing input
+  if thinBasic_CheckOpenParens_Mandatory = %FALSE then exit function
+  thinBasic_ParseNumber(wHandle)
 
-      currentDisplay = internal_GetWindowDisplay(wHandle)
-      dim info as tbgl_tDisplayInfo
-      internal_displayGetInfo(currentDisplay, info)
+  currentDisplay = internal_GetWindowDisplay(wHandle)
+  dim info as tbgl_tDisplayInfo
+  internal_displayGetInfo(currentDisplay, info)
 
-      GetWindowRect(wHandle, r)
+  GetWindowRect(wHandle, r)
 
-      newX = r.nLeft - info.leftPx
-      newY = r.nTop - info.topPx
+  if thinBasic_CheckComma_Mandatory = %FALSE then exit function
+  thinBasic_ParseNumber(eDisplay)
 
-      if thinBasic_CheckComma_Optional then
-        thinBasic_ParseNumber(NewX)
-      end if
-      if thinBasic_CheckComma_Optional then
-        thinBasic_ParseNumber(NewY)
-      end if
-      if thinBasic_CheckCloseParens_Mandatory then
-
-        dim newDisplayInfo as tbgl_tDisplayInfo
-        internal_displayGetInfo(eDisplay, newDisplayInfo)
-
-        newX += newDisplayInfo.leftPx
-        newY += newDisplayInfo.topPx
-
-        if newX > newDisplayInfo.rightPx then
-          newX = newDisplayInfo.leftPx
-        end if
-
-        if newY > newDisplayInfo.bottomPx then
-          newY = newDisplayInfo.topPx
-        end if
-
-        GetWindowRect(wHandle, r)
-        MoveWindow(wHandle, newX, newY, r.nRight-r.nLeft, r.nBottom-r.nTop, %TRUE)
-
-      end if
-    end if
+  if thinBasic_CheckComma_Optional then
+    thinBasic_ParseNumber(newX)
+  else
+    newX = r.nLeft - info.leftPx
   end if
+
+  if thinBasic_CheckComma_Optional then
+    thinBasic_ParseNumber(NewY)
+  else
+    newY = r.nTop - info.topPx
+  end if
+
+  if thinBasic_CheckCloseParens_Mandatory = %FALSE then exit function
+
+  ' -- Actual code
+  dim newDisplayInfo as tbgl_tDisplayInfo
+  internal_displayGetInfo(eDisplay, newDisplayInfo)
+
+  newX += newDisplayInfo.leftPx
+  newY += newDisplayInfo.topPx
+
+  if newX > newDisplayInfo.rightPx then
+    newX = newDisplayInfo.leftPx
+  end if
+
+  if newY > newDisplayInfo.bottomPx then
+    newY = newDisplayInfo.topPx
+  end if
+
+  GetWindowRect(wHandle, r)
+  MoveWindow(wHandle, newX, newY, r.nRight-r.nLeft, r.nBottom-r.nTop, %TRUE)
 
 end function
 
@@ -226,17 +219,15 @@ function internal_getWindowDisplay(byVal wHandle as dword) as long
 end function
 
 function Exec_TBGL_GetWindowDisplay() as long
-  dim eDisplay as long
+
   dim wHandle as ext
-  dim r as RECT
 
-  if thinBasic_CheckOpenParens_Mandatory then
-    thinBasic_ParseNumber(wHandle)
-    if thinBasic_CheckCloseParens_Mandatory then
+  ' -- Parsing input
+  if thinBasic_CheckOpenParens_Mandatory = %FALSE then exit function
+  thinBasic_ParseNumber(wHandle)
+  if thinBasic_CheckCloseParens_Mandatory = %FALSE then exit function
 
-      function = internal_getWindowDisplay(wHandle)
-
-    end if
-  end if
+  ' -- Actual code
+  function = internal_getWindowDisplay(wHandle)
 
 end function
