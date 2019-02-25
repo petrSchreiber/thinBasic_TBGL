@@ -168,8 +168,6 @@ END FUNCTION
 
 ' -- TBGL window callback
 FUNCTION WndProc( BYVAL hWnd AS DWORD, BYVAL wMsg AS DWORD, BYVAL wParam AS LONG, BYVAL lParam AS LONG ) AS LONG
-  LOCAL wr AS RECT, cr AS RECT, x AS LONG, y AS LONG, xx AS LONG, yy AS LONG
-  STATIC currentWidth, currentHeight, lastWidth, lastHeight AS LONG
 
   windowSizing = 0
 
@@ -190,20 +188,11 @@ FUNCTION WndProc( BYVAL hWnd AS DWORD, BYVAL wMsg AS DWORD, BYVAL wParam AS LONG
     CASE %WM_SIZE
 
       IF gOpenGLStarted THEN
-        GetWindowRect hWnd, wr
-        currentWidth = ( wr.nRight - wr.nLeft )
-        currentHeight= ( wr.nBottom - wr.nTop )
 
         IF wParam = %SIZE_MAXIMIZED THEN
           internal_MaximizeKeepAspectRatio()
         ELSE
-          ''if currentWidth - lastWidth > currentHeight - lastHeight then
-            internal_KeepAspectRatio( 0 )
-          ''elseIF lastWidth - currentWidth > currentHeight - lastHeight THEN
-          ''  internal_KeepAspectRatio( 0 )
-          ''eLSE
-          ''  internal_KeepAspectRatio( 1 )
-          ''end if
+          'internal_KeepAspectRatio( 0 )
         END IF
 
         ' -- Render dark frame during resizing
@@ -211,10 +200,6 @@ FUNCTION WndProc( BYVAL hWnd AS DWORD, BYVAL wMsg AS DWORD, BYVAL wParam AS LONG
         internal_RenderFrame
 
         windowSizing = 1
-
-        GetWindowRect hWnd, wr
-        lastWidth = ( wr.nRight - wr.nLeft )
-        lastHeight= ( wr.nBottom - wr.nTop )
 
         FUNCTION = 0
         EXIT FUNCTION
@@ -452,8 +437,6 @@ END FUNCTION
 
 ' -- Shows the created window
 SUB Exec_TBGL_ShowWindow( )
-  LOCAL d AS RECT, sx, sy AS LONG
-  LOCAL iar AS LONG
 
   ShowWindow (g_Win.handle, %SW_SHOWNORMAL)
 
@@ -463,18 +446,21 @@ SUB Exec_TBGL_ShowWindow( )
   ' -- Sets UI focus
   SetFocus g_Win.handle
 
-  iar = g_Win.ignrAspect
-  g_Win.ignrAspect = 0
+  local maxWindowWidth, maxWindowHeight as long
+  internal_getTopWindowDimensions(maxWindowWidth, maxWindowHeight)
 
-  GetWindowRect( g_Win.handle, d )
-  desktop get client to sx, sy
-'  sx = GetSystemMetrics( %SM_CXSCREEN )
-'  sy = GetSystemMetrics( %SM_CYSCREEN )
+  dim wr as RECT
+  GetWindowRect(g_Win.handle, wr)
+
+  local windowWidth, windowHeight as long
+  windowWidth = wr.nRight - wr.nLeft
+  windowHeight = wr.nBottom - wr.nTop
 
   ' -- If window gets bigger than desktop
-  IF d.nRight - d.nLeft > sx OR d.nBottom - d.nTop > sy THEN internal_MaximizeKeepAspectRatio
-  g_Win.ignrAspect = iar
-  internal_RefreshViewport( )
+  msgbox "a"
+  if windowWidth > maxWindowWidth OR windowHeight > maxWindowHeight then internal_MaximizeKeepAspectRatio()
+  msgbox "b"
+  internal_RefreshViewport()
 
   ' -- 2 dummy frames to clear buffers
   internal_RenderFrame

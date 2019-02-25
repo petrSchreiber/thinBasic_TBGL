@@ -180,58 +180,84 @@ SUB internal_RefreshViewportSoft( )
   END IF
 END SUB
 
+sub internal_getTopWindowDimensions(maxWindowWidth as long, maxWindowHeight as long)
+  dim currentDisplay as long
+  currentDisplay = internal_GetWindowDisplay(g_Win.handle)
+
+  if currentDisplay = 1 then
+    dim workArea as RECT
+    SystemParametersInfo(%SPI_GETWORKAREA, 0, workArea, 0)
+    maxWindowWidth  = workArea.nRight - workArea.nLeft
+    maxWindowHeight = workArea.nBottom - workArea.nTop
+  else
+    dim displayInfo as tbgl_tDisplayInfo
+
+    internal_displayGetInfo(currentDisplay, displayInfo)
+    maxWindowWidth  = displayInfo.widthPx
+    maxWindowHeight = displayInfo.heightPx
+  end if
+
+end sub
+
 ' -- Assures keeping ratio when maximizing
 SUB internal_MaximizeKeepAspectRatio( )
-  LOCAL wr AS RECT, cr AS RECT
-  LOCAL x, y, xx, yy, sx, sy AS LONG
-  LOCAL currentDisplay AS LONG
 
-  IF gOpenGLStarted = 1 AND g_Win.Fullscreen = 0 THEN
-    GetClientRect g_Win.handle, cr
+  if gOpenGLStarted = 1 and g_Win.Fullscreen = 0 then
 
-    IF cr.nRight = 0 THEN EXIT SUB
+    local maxWindowWidth, maxWindowHeight as long
+    internal_getTopWindowDimensions(maxWindowWidth, maxWindowHeight)
 
-    GetWindowRect g_Win.handle, wr
+    local posX, posY as long
+    local newWidth, newHeight as long
+    if g_Win.FullScreen = 0 then ' -- Windowed
 
-    currentDisplay = internal_GetWindowDisplay(g_Win.handle)
-    dim info as tbgl_tDisplayInfo
-    internal_displayGetInfo(currentDisplay, info)
+      dim wr as RECT
+      GetWindowRect(g_Win.handle, wr)
 
-    sx = info.widthPx
-    sy = info.heightPx
+      if g_Win.ignrAspect then
+        posX      = wr.nLeft
+        posY      = wr.nTop
+        newWidth  = maxWindowWidth
+        newHeight = maxWindowHeight
 
-    IF g_Win.FullScreen = 0 THEN    ' -- Windowed
-      IF g_Win.ignrAspect = 0 THEN
-        xx = sx
-        yy = ( sx - ( wr.nRight - wr.nLeft - cr.nRight )) / g_Win.aspectRat
-        yy+= (( wr.nBottom - wr.nTop ) - ( cr.nBottom ))
-        IF yy > sy THEN
-          yy = sy
-          xx = ( sy - ( wr.nBottom - wr.nTop - cr.nBottom )) * g_Win.aspectRat
-          xx+= ( wr.nRight - wr.nLeft - cr.nRight )
-        END IF
-        x = ( sx - xx ) / 2 + info.leftPx
-        y = ( sy - yy ) / 2 + info.topPx
-      ELSE
+      else
+        dim cr as RECT
+        GetClientRect g_Win.handle, cr
+        if cr.nRight = 0 then exit sub
 
-        x = info.leftPx
-        y = info.topPx
-        xx = sx - 1    ' oh well :")
-        yy = sy - 1
-      END IF
-      MoveWindow g_Win.handle, x, y, xx, yy, %TRUE
+        local horizontalWindowDecorationWidth, verticalWindowDecorationWidth as long
 
-    END IF
+        horizontalWindowDecorationWidth = wr.nRight - wr.nLeft - cr.nRight
+        verticalWindowDecorationWidth   = wr.nBottom - wr.nTop - cr.nBottom
+
+        if g_Win.aspectRat > maxWindowWidth/maxWindowHeight then
+          newWidth  = maxWindowWidth
+          newHeight = (maxWindowWidth - horizontalWindowDecorationWidth) / g_Win.aspectRat
+          newHeight += verticalWindowDecorationWidth
+        else
+          newHeight = maxWindowHeight
+          newWidth = (maxWindowHeight - verticalWindowDecorationWidth) * g_Win.aspectRat
+          newWidth+= horizontalWindowDecorationWidth
+        end if
+
+        posX = (maxWindowWidth - newWidth) / 2 + wr.nLeft
+        posY = (maxWindowHeight - newHeight) / 2 + wr.nTop
+
+      end if
+
+      MoveWindow(g_Win.handle, posX, posY, newWidth, newHeight, %TRUE)
+
+    end if
 
     ' -- Synces window size and viewport size
-    internal_RefreshViewport( )
+    internal_RefreshViewport()
 
-  END IF
-END SUB
+  end if
+end sub
 
 ' -- General function to keep aspect ratio
 SUB internal_KeepAspectRatio( BYVAL KeepBasedOnY AS LONG )
-
+                msgbox "kar"
   LOCAL wr          , cr            AS RECT
   LOCAL posX        , posY          AS LONG
   LOCAL wWidth      , wHeight       AS LONG
@@ -309,97 +335,6 @@ SUB internal_KeepAspectRatio( BYVAL KeepBasedOnY AS LONG )
 
   internal_RefreshViewport( )
 
-'  LOCAL wr AS RECT, cr AS RECT, x AS LONG, y AS LONG, xx AS LONG, yy AS LONG
-'  local minClientApplied as long
-'  local widthDelta, heightDelta, cxx, cyy as long
-'  IF gOpenGLStarted = 1 AND g_Win.Fullscreen = 0 THEN
-'
-'    GetClientRect g_Win.handle, cr
-'    IF cr.nRight = 0 THEN EXIT SUB
-'
-'    GetWindowRect g_Win.handle, wr
-'
-'    ' -- Postprocessing of size only for windowed mode
-'    IF g_Win.FullScreen = 0 THEN
-'      x = wr.nLeft
-'      y = wr.nTop
-'
-'      ' -- Calculate client size, and window size, when we need it for min client constraint
-'      IF g_Win.minWidth <> -1 OR g_Win.minHeight <> -1 THEN
-'        cxx = ( cr.nRight - cr.nLeft )
-'        cyy = ( cr.nBottom - cr.nTop )
-'
-'        widthDelta  = ( wr.nRight  - wr.nLeft ) - cxx
-'        heightDelta = ( wr.nBottom - wr.nTop  ) - cyy
-'
-'        ' -- Is width client constraint reached?
-'        IF g_Win.minWidth <> -1 THEN
-'
-'          ' -- For case of locked aspect ratio
-'          IF g_Win.ignrAspect = 0 THEN
-'
-'
-'          else
-'            IF cxx < g_Win.minWidth THEN
-'              minClientApplied = 1
-'              cxx = g_Win.minWidth
-'            END IF
-'          end if
-'
-'        END IF
-'
-'        ' -- Is height client constraint reached?
-'        IF g_Win.minHeight <> -1 THEN
-'
-'          IF cyy < g_Win.minHeight THEN
-'            minClientApplied = 1
-'            cyy = g_Win.minHeight
-'          END IF
-'
-'        END IF
-'
-'        ' -- If any of the constraints applied, let's tune the client
-'        IF minClientApplied THEN
-'
-'          xx = cxx + widthDelta
-'          yy = cyy + heightDelta
-'          IF g_Win.ignrAspect <> 0 THEN
-'            MoveWindow g_Win.handle, x, y, xx, yy, %TRUE
-'          end if
-'        END IF
-'
-'      END IF
-'
-'      ' -- For case of locked aspect ratio
-'      IF g_Win.ignrAspect = 0 THEN
-'
-'        ' -- Check aspect ratio
-'        IF KeepBasedOnY = 0 THEN
-'
-'          if minClientApplied = 1 then
-'            yy = cyy + heightDelta
-'            xx = (cxx * g_Win.aspectRat) + widthDelta            '' ------------------------------------ BLBOST, osetrit ruzna aspect ratia
-'
-'''            xx = cxx + widthDelta
-'''            yy = (cyy * g_Win.aspectRat) + heightDelta
-'          else
-'            xx = ( wr.nRight - wr.nLeft )
-'            yy = ( wr.nBottom - wr.nTop ) + (( cr.nRight / g_Win.aspectRat ) - cr.nBottom )
-'          end if
-'        ELSE
-'          yy = ( wr.nBottom - wr.nTop )
-'          xx = ( wr.nRight - wr.nLeft ) + (( cr.nBottom * g_Win.aspectRat ) - cr.nRight )
-'        END IF
-'
-'        MoveWindow g_Win.handle, x, y, xx, yy, %TRUE
-'
-'      END IF
-'    END IF
-'
-'    ' -- Synces window size and viewport size
-'    internal_RefreshViewport( )
-'
-'  END IF
 END SUB
 
 ' -- Sets fullscreen mode safely
