@@ -37,10 +37,11 @@
 
 ' -----------------------------------------------------------------------------
 
-TYPE tWinFont
-  ListBase AS LONG
-  fHandle AS DWORD
-END TYPE
+type tWinFont
+  ListBase  as long
+  fHandle   as dword
+  charSet   as dword
+end type
 
 GLOBAL g_WinFont( ) AS tWinFont
 GLOBAL g_TBGL_SetActiveFont AS LONG
@@ -88,22 +89,41 @@ END SUB
 ' -- TTF fonts
 ' -----------------------------------------------------------------------------
 
+%TBGL_ANSI_CHARSET        = 0
+%TBGL_DEFAULT_CHARSET     = 1
+%TBGL_SYMBOL_CHARSET      = 2
+%TBGL_SHIFTJIS_CHARSET    = 128
+%TBGL_HANGEUL_CHARSET     = 129
+%TBGL_HANGUL_CHARSET      = 129
+%TBGL_CHINESEBIG5_CHARSET = 136
+%TBGL_OEM_CHARSET         = 255
+%TBGL_JOHAB_CHARSET       = 130
+%TBGL_HEBREW_CHARSET      = 177
+%TBGL_ARABIC_CHARSET      = 178
+%TBGL_GREEK_CHARSET       = 161
+%TBGL_TURKISH_CHARSET     = 162
+%TBGL_THAI_CHARSET        = 222
+%TBGL_EASTEUROPE_CHARSET  = 238
+%TBGL_RUSSIAN_CHARSET     = 204
+%TBGL_MAC_CHARSET         = 77
+%TBGL_BALTIC_CHARSET      = 186
+
 ' -- Creates windows font and returns its handle
 FUNCTION Exec_TBGL_FontHandle( ) AS EXT
 
   LOCAL sFntName AS STRING
-  LOCAL fFntSize, fStyle AS EXT
+  LOCAL fFntSize, fStyle, fCharset AS EXT
   LOCAL lStyle AS LONG
   LOCAL lWeight, lItalic, lCharSet AS LONG
-  lCharset = %DEFAULT_CHARSET
 
   LOCAL n AS LONG
 
-  n = thinBasic_Parse1StringXNumbers( 1, 2, sFntName, fFntSize, fStyle )
+  n = thinBasic_Parse1StringXNumbers( 1, 3, sFntName, fFntSize, fStyle, fCharset )
 
   lStyle = fStyle
   lWeight = IIF( BIT( lStyle, 0 ) = 0, %FW_NORMAL, %FW_BOLD )
   lItalic = IIF( BIT( lStyle, 1 ) = 0, %FALSE, %TRUE )
+  lCharset = iif(n = 3, fCharset, %DEFAULT_CHARSET)
 
   LOCAL lf AS LOGFONT
 
