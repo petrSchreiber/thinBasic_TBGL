@@ -269,8 +269,6 @@ SUB Exec_TBGL_PrintFont( )
     glListBase 0
   glPopAttrib
 
-  msgbox "}"
-
 END SUB
 
 ' -- Prints font on screen
