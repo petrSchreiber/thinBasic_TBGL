@@ -2105,6 +2105,25 @@ FUNCTION LoadLocalSymbols ALIAS "LoadLocalSymbols" ( OPTIONAL BYVAL sPath AS STR
   thinBasic_AddEquate   "%TBGL_PIXEL_PERFECT_2D"   , "" , %TBGL_PIXEL_PERFECT_2D
   thinBasic_AddEquate   "%TBGL_OPENGL_ORTHO_2D"    , "" , %TBGL_OPENGL_ORTHO_2D
 
+  thinBasic_AddEquate   "%TBGL_ANSI_CHARSET"        , "" , %TBGL_ANSI_CHARSET
+  thinBasic_AddEquate   "%TBGL_DEFAULT_CHARSET"     , "" , %TBGL_DEFAULT_CHARSET
+  thinBasic_AddEquate   "%TBGL_SYMBOL_CHARSET"      , "" , %TBGL_SYMBOL_CHARSET
+  thinBasic_AddEquate   "%TBGL_SHIFTJIS_CHARSET"    , "" , %TBGL_SHIFTJIS_CHARSET
+  thinBasic_AddEquate   "%TBGL_HANGEUL_CHARSET"     , "" , %TBGL_HANGEUL_CHARSET
+  thinBasic_AddEquate   "%TBGL_HANGUL_CHARSET"      , "" , %TBGL_HANGUL_CHARSET
+  thinBasic_AddEquate   "%TBGL_CHINESEBIG5_CHARSET" , "" , %TBGL_CHINESEBIG5_CHARSET
+  thinBasic_AddEquate   "%TBGL_OEM_CHARSET"         , "" , %TBGL_OEM_CHARSET
+  thinBasic_AddEquate   "%TBGL_JOHAB_CHARSET"       , "" , %TBGL_JOHAB_CHARSET
+  thinBasic_AddEquate   "%TBGL_HEBREW_CHARSET"      , "" , %TBGL_HEBREW_CHARSET
+  thinBasic_AddEquate   "%TBGL_ARABIC_CHARSET"      , "" , %TBGL_ARABIC_CHARSET
+  thinBasic_AddEquate   "%TBGL_GREEK_CHARSET"       , "" , %TBGL_GREEK_CHARSET
+  thinBasic_AddEquate   "%TBGL_TURKISH_CHARSET"     , "" , %TBGL_TURKISH_CHARSET
+  thinBasic_AddEquate   "%TBGL_THAI_CHARSET"        , "" , %TBGL_THAI_CHARSET
+  thinBasic_AddEquate   "%TBGL_EASTEUROPE_CHARSET"  , "" , %TBGL_EASTEUROPE_CHARSET
+  thinBasic_AddEquate   "%TBGL_RUSSIAN_CHARSET"     , "" , %TBGL_RUSSIAN_CHARSET
+  thinBasic_AddEquate   "%TBGL_MAC_CHARSET"         , "" , %TBGL_MAC_CHARSET
+  thinBasic_AddEquate   "%TBGL_BALTIC_CHARSET"      , "" , %TBGL_BALTIC_CHARSET
+
 END FUNCTION
 
 '----------------------------------------------------------------------------

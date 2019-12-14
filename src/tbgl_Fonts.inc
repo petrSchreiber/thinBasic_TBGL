@@ -40,7 +40,6 @@
 type tWinFont
   ListBase  as long
   fHandle   as dword
-  charSet   as dword
 end type
 
 GLOBAL g_WinFont( ) AS tWinFont
@@ -62,13 +61,59 @@ END TYPE
 GLOBAL g_BMPFont( ) AS tBMPFont
 GLOBAL g_TBGL_SetActiveBMPFont AS LONG
 
-'GLOBAL lpTextureFont( ) AS AUX_RGBImageRec PTR  ' -- defined in tbgl_texturing
+class cCharsetManager
+  instance handleToCharset as iPowerCollection
+
+  interface iCharsetManager
+    inherit iUnknown
+
+    method initialize()
+      handleToCharset = class "PowerCollection"
+    end method
+
+    method deinitialize()
+      handleToCharset.clear()
+    end method
+
+    ' ---
+
+    method fontHandle2Key(byVal fontHandle as dword) as wstring
+      method = mkdwd$(fontHandle)
+    end method
+
+    method key2FontHandle(byVal key as wstring) as dword
+      method = cvdwd(key)
+    end method
+
+    method SetFontCharset(byVal fontHandle as dword, byVal charset as dword)
+      dim key as wstring
+      key = me.fontHandle2Key(fontHandle)
+
+      if handleToCharset.contains(key) then
+        handleToCharset.remove(key)
+      end if
+
+      handleToCharset.add(key, charset)
+    end method
+
+    method GetFontCharset(byVal fontHandle as dword) as dword
+      dim key as wstring
+      key = me.fontHandle2Key(fontHandle)
+
+      method = variant#(handleToCharset.item(key))
+    end method
+  end interface
+end class
+
+global g_charsetManager as iCharsetManager
 
 ' -----------------------------------------------------------------------------
 
 ' >RESOURCES - RESOURCES - RESOURCES - RESOURCES - RESOURCES - RESOURCES - RESOURCES
 SUB resource_Fonts_Alloc()
   glGenTextures %LIMIT_MAX_FONTINDEX, lpTextureFont( 0 )
+  g_charsetManager = class "cCharsetManager"
+  g_charsetManager.initialize()
 END SUB
 
 SUB resource_Fonts_Release()
@@ -81,6 +126,9 @@ SUB resource_Fonts_Release()
     internal_FontCleanup( i )
     internal_FontBMPCleanup( i )
   NEXT
+
+  g_charsetManager.deinitialize()
+  g_charsetManager = nothing
 
 END SUB
 ' <RESOURCES - RESOURCES - RESOURCES - RESOURCES - RESOURCES - RESOURCES - RESOURCES
@@ -146,7 +194,13 @@ FUNCTION Exec_TBGL_FontHandle( ) AS EXT
   lf.lfStrikeOut = %FALSE    'lStrike
   lf.lfCharSet = lCharSet
 
-  FUNCTION = CreateFontIndirect( lf )
+  local fontHandle as dWord
+  fontHandle = CreateFontIndirect(lf)
+  local key as wstring
+  key = mkd$(fontHandle)
+
+  g_charsetManager.SetFontCharset(fontHandle, fCharset)
+  FUNCTION = fontHandle
 
 END FUNCTION
 
@@ -195,7 +249,13 @@ SUB Exec_TBGL_PrintFont( )
 
   nParams = thinBasic_Parse1StringXNumbers( 2, 3, stext, x, y, z )
 
-  textik = stext
+  dim prevCharset as long
+  dim charset as long
+  charset = g_charsetManager.GetFontCharset(g_WinFont(g_TBGL_SetActiveFont).fHandle)
+
+  ucodepage charset to prevCharset
+  textik = utf8tochr$(stext)
+  ucodepage prevCharset
 
   IF nParams = 2 THEN
     internal_ManagedRasterPos(x, y, 0)
@@ -208,6 +268,8 @@ SUB Exec_TBGL_PrintFont( )
     glCallLists LEN( textik ), %GL_UNSIGNED_BYTE, textik
     glListBase 0
   glPopAttrib
+
+  msgbox "}"
 
 END SUB
 
